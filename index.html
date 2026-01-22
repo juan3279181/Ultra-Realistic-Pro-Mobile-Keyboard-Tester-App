@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultra-Realistic Mobile Typing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+body {
+    margin:0;
+    font-family: Arial,sans-serif;
+    background:#f2f4f8;
+}
+header {
+    background:#222;
+    color:white;
+    text-align:center;
+    padding:15px;
+    font-size:18px;
+}
+main {
+    padding:15px;
+    padding-bottom:350px;
+}
+.card {
+    background:white;
+    border-radius:12px;
+    padding:15px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.1);
+    margin-bottom:15px;
+}
+.stats {
+    display:flex;
+    justify-content:space-between;
+    font-size:15px;
+    margin-bottom:10px;
+}
+#target {
+    text-align:center;
+    font-size:64px;
+    font-weight:bold;
+    margin:20px 0;
+}
+.actions {
+    display:flex;
+    gap:10px;
+    margin-bottom:10px;
+}
+.actions button {
+    flex:1;
+    padding:14px;
+    font-size:16px;
+    border:none;
+    border-radius:8px;
+    color:white;
+    cursor:pointer;
+}
+.actions button.reset { background:#f44336; }
+.mode-buttons {
+    display:flex;
+    gap:5px;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+}
+.mode-buttons button {
+    flex:1;
+    padding:10px;
+    font-size:14px;
+    border-radius:6px;
+    border:none;
+    cursor:pointer;
+}
+.mode-buttons button.active {
+    background:#4CAF50;
+    color:white;
+}
+#result { text-align:center; font-weight:bold; margin-top:10px; }
+.keyboard {
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    background:#c4c4c4;
+    padding:8px;
+}
+.row {
+    display:flex;
+    justify-content:center;
+    margin-bottom:5px;
+}
+.key {
+    background:#e0e0e0;
+    margin:2px;
+    padding:16px 0;
+    border-radius:12px;
+    text-align:center;
+    font-weight:bold;
+    font-size:16px;
+    box-shadow: 0 3px #999;
+    user-select:none;
+    cursor:pointer;
+    flex:1;
+    max-width:50px;
+    transition: 0.1s;
+}
+.key:active {
+    background:#d0d0d0;
+    box-shadow: 0 2px #666;
+    transform: translateY(2px);
+}
+.key.active { background:#4CAF50; color:white; box-shadow: 0 3px #666; }
+.key.wide { flex:1.5; max-width:90px; }
+.key.space { flex:6; max-width:300px; }
+.key.enter { flex:2; max-width:100px; }
+.key.tab { flex:1.5; max-width:90px; }
+.key.shift { flex:2; max-width:100px; }
+.key.backspace { flex:2; max-width:100px; }
+</style>
+</head>
+<body>
+
+<header>Ultra-Realistic Mobile Typing</header>
+
+<main>
+<div class="card">
+    <div class="mode-buttons">
+        <button id="lettersBtn" class="active" onclick="setMode('letters')">Letters</button>
+        <button id="numbersBtn" onclick="setMode('numbers')">Numbers</button>
+        <button id="symbolsBtn" onclick="setMode('symbols')">Symbols</button>
+        <button id="allBtn" onclick="setMode('all')">All</button>
+    </div>
+
+    <div class="stats">
+        <div id="time">Time: 30</div>
+        <div id="score">Score: 0</div>
+        <div id="best">Best: 0</div>
+    </div>
+
+    <div id="target">START</div>
+
+    <div class="actions">
+        <button onclick="startGame()">Start</button>
+        <button class="reset" onclick="resetGame()">Reset</button>
+    </div>
+
+    <div id="result"></div>
+</div>
+</main>
+
+<div class="keyboard" id="keyboardContainer"></div>
+
+<script>
+// Keyboard rows (realistic mobile layout)
+const rows = [
+["`","1","2","3","4","5","6","7","8","9","0","-","=","backspace"],
+["tab","Q","W","E","R","T","Y","U","I","O","P","[","]","\\"],
+["caps","A","S","D","F","G","H","J","K","L",";",":","'","enter"],
+["shift","Z","X","C","V","B","N","M",",",".","/","shift"],
+["space"]
+];
+
+let currentChars = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+let current="";
+let score=0;
+let timeLeft=30;
+let timer;
+let bestScore = localStorage.getItem("bestScore")||0;
+
+const target = document.getElementById("target");
+const scoreEl = document.getElementById("score");
+const timeEl = document.getElementById("time");
+const bestEl = document.getElementById("best");
+const resultEl = document.getElementById("result");
+const keyboardContainer = document.getElementById("keyboardContainer");
+const modeButtons = {
+letters: document.getElementById("lettersBtn"),
+numbers: document.getElementById("numbersBtn"),
+symbols: document.getElementById("symbolsBtn"),
+all: document.getElementById("allBtn")
+};
+
+bestEl.textContent="Best: "+bestScore;
+
+// Mode switch
+function setMode(mode){
+Object.values(modeButtons).forEach(b=>b.classList.remove("active"));
+modeButtons[mode].classList.add("active");
+
+if(mode==="letters") currentChars=[..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+else if(mode==="numbers") currentChars=[..."0123456789"];
+else if(mode==="symbols") currentChars=["!","@","#","$","%","^","&","*","(",")","-","_","=","+","[","]","{","}",";",":","'",'"',",",".","/","<",">","?","\\","|","~","`"];
+else currentChars=[..."ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:'\",.<>?/\\|~`"];
+
+generateKeyboard();
+}
+
+// Generate keyboard
+function generateKeyboard(){
+keyboardContainer.innerHTML="";
+rows.forEach(r=>{
+    const rowDiv=document.createElement("div");
+    rowDiv.className="row";
+    r.forEach(key=>{
+        const keyDiv=document.createElement("div");
+        keyDiv.className="key";
+        if(key==="space") keyDiv.classList.add("space");
+        else if(key==="enter") keyDiv.classList.add("enter");
+        else if(key==="shift") keyDiv.classList.add("shift");
+        else if(key==="tab") keyDiv.classList.add("tab");
+        else if(key==="backspace") keyDiv.classList.add("backspace");
+        keyDiv.textContent=key.length>1? key.toUpperCase() : key;
+        keyDiv.addEventListener("click",()=>tapKey(keyDiv.textContent));
+        rowDiv.appendChild(keyDiv);
+    });
+    keyboardContainer.appendChild(rowDiv);
+});
+}
+
+function highlightKey(char){
+document.querySelectorAll(".key").forEach(k=>k.classList.remove("active"));
+document.querySelectorAll(".key").forEach(k=>{if(k.textContent===char) k.classList.add("active");});
+}
+
+function randomChar(){
+current = currentChars[Math.floor(Math.random()*currentChars.length)];
+target.textContent=current;
+highlightKey(current);
+}
+
+function startGame(){
+score=0; timeLeft=30; scoreEl.textContent="Score: 0"; timeEl.textContent="Time: 30"; resultEl.textContent="";
+randomChar();
+clearInterval(timer);
+timer=setInterval(()=>{
+timeLeft--; timeEl.textContent="Time: "+timeLeft;
+if(timeLeft<=0) endGame();
+},1000);
+}
+
+function endGame(){
+clearInterval(timer);
+document.querySelectorAll(".key").forEach(k=>k.classList.remove("active"));
+target.textContent="DONE";
+if(score>bestScore){bestScore=score; localStorage.setItem("bestScore",bestScore); resultEl.textContent=" New best score!";}
+else resultEl.textContent="Try again to beat your best!";
+bestEl.textContent="Best: "+bestScore;
+}
+
+function resetGame(){
+clearInterval(timer);
+document.querySelectorAll(".key").forEach(k=>k.classList.remove("active"));
+target.textContent="START"; score=0; timeLeft=30;
+scoreEl.textContent="Score: 0"; timeEl.textContent="Time: 30"; resultEl.textContent="";
+}
+
+function tapKey(char){
+if(timeLeft<=0) return;
+if(char===current){
+score++; scoreEl.textContent="Score: "+score;
+randomChar();
+}
+}
+
+// Initialize
+generateKeyboard();
+</script>
+
+</body>
+</html>
